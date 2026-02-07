@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mimir Usage Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: #64748b; margin-bottom: 2rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+        }
+        .card h3 {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+        .card .subvalue {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+        .chart-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+            margin-bottom: 1rem;
+        }
+        .chart-container h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #f8fafc;
+        }
+        .chart-wrapper { height: 300px; }
+        .two-col {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.5rem; }
+            .grid { grid-template-columns: repeat(2, 1fr); }
+            .card { padding: 1rem; }
+            .card .value { font-size: 1.5rem; }
+            .two-col { grid-template-columns: 1fr; }
+            .chart-wrapper { height: 250px; }
+            .header-row { flex-direction: column; align-items: flex-start; }
+        }
+        @media (max-width: 480px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .updated {
+            text-align: center;
+            color: #64748b;
+            margin-top: 2rem;
+            font-size: 0.875rem;
+        }
+        .refresh-btn {
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-bottom: 1rem;
+            transition: opacity 0.2s;
+        }
+        .refresh-btn:hover { opacity: 0.9; }
+        .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <div>
+                <h1>🦉 Mimir Usage Dashboard</h1>
+                <p class="subtitle">Track API costs, token usage, and model performance</p>
+            </div>
+            <button class="refresh-btn" onclick="refreshDashboard()" id="refreshBtn">🔄</button>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>Total Cost</h3>
+                <div class="value">$0.0522</div>
+                <div class="subvalue">All time</div>
+            </div>
+            <div class="card">
+                <h3>Most Costly API</h3>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.25rem;">
+                    <span style="font-size: 1.25rem; font-weight: 600; color: #f8fafc;">nano_banana_pro</span>
+                    <span style="font-size: 2rem; font-weight: 700; color: #f8fafc;">$0.0500</span>
+                </div>
+                <div class="subvalue">95.8% of total cost</div>
+            </div>
+            <div class="card">
+                <h3>Most Used API</h3>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.25rem;">
+                    <span style="font-size: 1.25rem; font-weight: 600; color: #f8fafc;">brave_search</span>
+                    <span style="font-size: 2rem; font-weight: 700; color: #f8fafc;">2</span>
+                </div>
+                <div class="subvalue">33.3% of total calls</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>📈 Daily Cost (Last 30 Days)</h2>
+            <div class="chart-wrapper">
+                <canvas id="costChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>📊 Daily Usage Count (Last 30 Days)</h2>
+            <div class="chart-wrapper">
+                <canvas id="usageChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>🔌 Cost by API (All-Time)</h2>
+            <div class="chart-wrapper">
+                <canvas id="apiChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="two-col">
+            <div class="chart-container">
+                <h2>📊 All-Time Cost by Source (excludes subscription models)</h2>
+                <div class="chart-wrapper">
+                    <canvas id="modelChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <p class="updated">Last updated: 07-Feb-26 11:16</p>
+    </div>
+    
+    <script>
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = '#334155';
+        
+        // Daily cost chart (stacked by model)
+        new Chart(document.getElementById('costChart'), {
+            type: 'bar',
+            data: {
+                labels: ["06-Feb-26", "07-Feb-26"],
+                datasets: [{"label": "brave_search", "data": [0.0, 0], "backgroundColor": "#fbbf24"}, {"label": "github_api", "data": [0.0, 0], "backgroundColor": "#a3e635"}, {"label": "google_drive", "data": [0.0, 0], "backgroundColor": "#e879f9"}, {"label": "nano_banana_pro", "data": [0.05, 0], "backgroundColor": "#60a5fa"}, {"label": "openai_whisper_api", "data": [0, 0.002188], "backgroundColor": "#34d399"}]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            footer: function(tooltipItems) {
+                                let total = 0;
+                                tooltipItems.forEach(function(tooltipItem) {
+                                    total += tooltipItem.parsed.y;
+                                });
+                                return 'Total: $' + total.toFixed(4);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        stacked: true,
+                        grid: { display: false }
+                    },
+                    y: { 
+                        stacked: true,
+                        beginAtZero: true,
+                        grid: { color: '#334155' }
+                    }
+                }
+            }
+        });
+        
+        // Daily usage count chart (stacked by source)
+        new Chart(document.getElementById('usageChart'), {
+            type: 'bar',
+            data: {
+                labels: ["06-Feb-26", "07-Feb-26"],
+                datasets: [{"label": "brave_search", "data": [2, 0], "backgroundColor": "#fbbf24"}, {"label": "github_api", "data": [1, 0], "backgroundColor": "#a3e635"}, {"label": "google_drive", "data": [1, 0], "backgroundColor": "#e879f9"}, {"label": "nano_banana_pro", "data": [1, 0], "backgroundColor": "#60a5fa"}, {"label": "openai_whisper_api", "data": [0, 1], "backgroundColor": "#34d399"}]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            footer: function(tooltipItems) {
+                                let total = 0;
+                                tooltipItems.forEach(function(tooltipItem) {
+                                    total += tooltipItem.parsed.y;
+                                });
+                                return 'Total: ' + total + ' calls';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        stacked: true,
+                        grid: { display: false }
+                    },
+                    y: { 
+                        stacked: true,
+                        beginAtZero: true,
+                        grid: { color: '#334155' },
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Cost by Source chart (pie chart with models + APIs, all-time)
+        new Chart(document.getElementById('modelChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ["brave_search", "github_api", "google_drive", "nano_banana_pro", "openai_whisper_api"],
+                datasets: [{
+                    data: [0.0, 0.0, 0.0, 0.05, 0.002188],
+                    backgroundColor: ["#fbbf24", "#a3e635", "#e879f9", "#60a5fa", "#34d399"]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+        
+        // API cost chart
+        new Chart(document.getElementById('apiChart'), {
+            type: 'bar',
+            data: {
+                labels: ["nano_banana_pro", "openai_whisper_api", "brave_search", "github_api", "google_drive"],
+                datasets: [{
+                    label: 'Cost ($)',
+                    data: [0.05, 0.002188, 0.0, 0.0, 0.0],
+                    backgroundColor: ["#60a5fa", "#34d399", "#fbbf24", "#a3e635", "#e879f9"]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+        
+        // Refresh function
+        async function refreshDashboard() {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            
+            try {
+                const response = await fetch('/refresh', { method: 'POST' });
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    // Fallback: just reload anyway
+                    location.reload();
+                }
+            } catch (err) {
+                // Fallback: just reload
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
