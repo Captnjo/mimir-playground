@@ -25,29 +25,6 @@ TOPIC_REQUEST = f"device/{PRINTER_SERIAL}/request"
 # Status file
 STATUS_FILE = "/tmp/printer_status.json"
 
-# Bambu CA certificate
-BAMBU_CERT = """-----BEGIN CERTIFICATE-----
-MIIDZTCCAk2gAwIBAgIUV1FckwXElyek1onFnQ9kL7Bk4N8wDQYJKoZIhvcNAQEL
-BQAwQjELMAkGA1UEBhMCQ04xIjAgBgNVBAoMGUJCTCBUZWNobm9sb2dpaWVzIENv
-LiwgTHRkMQ8wDQYDVQQDDAZCQkwgQ0EwHhcNMjIwNDA0MDM0MjExWhcNMzIwNDAx
-MDM0MjExWjBCMQswCQYDVQQGEwJDTjEiMCAGA1UECgwZQkJMIFRlY2hub2xvZ2ll
-cyBDby4sIEx0ZDEPMA0GA1UEAwwGQkJMIENBMIIBIjANBgkqhkiG9w0BAQEFAAOC
-AQ8AMIIBCgKCAQEAy96Zw3cRjpOWeq7oIk+HaTNI7vt12rcc9PVGO5m4+LZCHW8u
-B6HhHYmEmY3OSyZ4Cbgh8LRGwSbdQa4kXUlaxe+jvQ9lGgQ8mphKNHccEmlcWYg1
-Vgnngj3RC6RWXRIUjU2k+Du84L3JxbHxzGv9LzAJLxO4tKqd5oxM2C38+tGsXA6C
-S5Ke5+kSl+PuCWwOCJU6BY6UpXT5gvs5zqO2ADrF7ewGCmOhpz9AcFFc0icVPv/l
-Rcv0K5mBjcJa0LXURB3kYtEjSt9sdfmzp3XyT9LKI7iKw4yrHQi8nugkmSL6p26M
-MFtY0cGYEwUdvWadp8wqMSWHFPU0kKf+CmbljVUCAwEAAaNTMFEwHQYDVR0OBBYE
-FI80QmjcZ06PxCKexXxJ5avdRL4eMB8GA1UdIwQYMBaAFI80QmjcZ06PxCKexXxJ
-5avdRL4eMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAAGUhE+W
-Xhn4HCtS1odQjfbE88TAi27UzxRdTRhgNd5gKbuo9YeWBC2yinFqn18zJ1XgG9Oh
-7btygKjHvsI+y4jUzRTvvrwZtv4n+ibfw1MNQgBHDeqnoehEtDV/CyUVUn9KnU8T
-ybgAXTqKPel1+K0T6MXnndXKauYWcG3pGt/giRle+orVqd+VKua5lKq5ckDq/1ms
-eorLSMzGzDH4YFM1OdQNj/4Upw9zQzF7/sFGPwL6oCC+7u32wyp5LtRsxCiJH8/I
-ZkbOnfEglPPccq8M0ND0fOd4qx2rN1qx1amm9z/qjcEdGIqy9EJO17f6tztYK4jY
-NhaW44N6G6R6PQ==
------END CERTIFICATE-----"""
-
 connected = False
 status = {}
 
@@ -81,22 +58,36 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Error: {e}")
 
-def create_ssl_context():
-    """Create SSL context with Bambu CA cert"""
-    # Write cert to temp file
+def download_cert():
+    """Download Bambu CA certificate from HA integration"""
+    import urllib.request
+    url = "https://raw.githubusercontent.com/greghesp/ha-bambulab/main/custom_components/bambu_lab/pybambu/bambu.cert"
     cert_path = "/tmp/bambu_ca.crt"
-    with open(cert_path, 'w') as f:
-        f.write(BAMBU_CERT)
-    
-    # Create context
+    try:
+        urllib.request.urlretrieve(url, cert_path)
+        print(f"Downloaded cert to {cert_path}")
+        return cert_path
+    except Exception as e:
+        print(f"Failed to download cert: {e}")
+        return None
+
+def create_ssl_context(cert_path):
+    """Create SSL context with Bambu CA cert"""
     context = ssl.create_default_context(cafile=cert_path)
     context.check_hostname = False  # IP address mismatch workaround
-    context.verify_flags &= ~ssl.VERIFY_X509_STRICT  # Ignore key usage extension error
+    # Ignore "CA cert does not include key usage extension" error
+    context.verify_flags &= ~ssl.VERIFY_X509_STRICT
     return context
 
 def main():
     print("Testing MQTT with Bambu CA certificate...")
     print("=" * 40)
+    
+    # Download cert
+    cert_path = download_cert()
+    if not cert_path:
+        print("Failed to get certificate")
+        return
     
     client = mqtt.Client(
         client_id=f"bambu_test_{int(time.time())}",
@@ -110,8 +101,16 @@ def main():
     client.on_message = on_message
     
     # TLS with Bambu CA cert
-    context = create_ssl_context()
-    client.tls_set_context(context)
+    try:
+        context = create_ssl_context(cert_path)
+        client.tls_set_context(context)
+    except Exception as e:
+        print(f"SSL context error: {e}")
+        print("Falling back to no verification...")
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        client.tls_set_context(context)
     
     # Auth
     client.username_pw_set("bblp", PRINTER_ACCESS_CODE)
