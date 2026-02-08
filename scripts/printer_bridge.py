@@ -29,7 +29,7 @@ STATUS_FILE = "/tmp/printer_status.json"
 
 class PrinterBridge:
     def __init__(self):
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
         self.status = {}
         self.connected = False
         
@@ -37,7 +37,8 @@ class PrinterBridge:
         if rc == 0:
             print(f"[{datetime.now()}] Connected to printer")
             self.connected = True
-            client.subscribe(TOPIC_REPORT)
+            result, mid = client.subscribe(TOPIC_REPORT)
+            print(f"[{datetime.now()}] Subscribe result: {result}")
         else:
             print(f"[{datetime.now()}] Connection failed: {rc}")
             self.connected = False
