@@ -67,8 +67,8 @@ class PrinterBridge:
         self.client.tls_set(cert_reqs=ssl.CERT_NONE)
         self.client.tls_insecure_set(True)
         
-        # Auth (serial as username, access code as password)
-        self.client.username_pw_set(PRINTER_SERIAL, PRINTER_ACCESS_CODE)
+        # Auth (bblp as username, access code as password for local LAN mode)
+        self.client.username_pw_set("bblp", PRINTER_ACCESS_CODE)
         
         try:
             self.client.connect(PRINTER_IP, PRINTER_PORT, 60)
