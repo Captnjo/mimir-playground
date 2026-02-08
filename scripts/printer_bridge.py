@@ -40,9 +40,17 @@ class PrinterBridge:
             self.connected = True
             result, mid = client.subscribe(TOPIC_REPORT)
             print(f"[{datetime.now()}] Subscribe result: {result}")
+            # Request full status update
+            self.request_status()
         else:
             print(f"[{datetime.now()}] Connection failed: {rc}")
             self.connected = False
+    
+    def request_status(self):
+        """Request a full status update from printer"""
+        payload = json.dumps({"pushing": {"sequence_id": "0", "command": "pushall"}})
+        self.client.publish(TOPIC_REQUEST, payload)
+        print(f"[{datetime.now()}] Requested status update")
     
     def on_disconnect(self, client, userdata, rc):
         print(f"[{datetime.now()}] Disconnected from printer")
