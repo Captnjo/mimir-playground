@@ -29,7 +29,8 @@ STATUS_FILE = "/tmp/printer_status.json"
 
 class PrinterBridge:
     def __init__(self):
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+        # Use specific client ID format for Bambu
+        self.client = mqtt.Client(client_id=f"bambu_pine_{int(time.time())}", callback_api_version=mqtt.CallbackAPIVersion.VERSION1)
         self.status = {}
         self.connected = False
         
@@ -64,8 +65,12 @@ class PrinterBridge:
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
         
-        # TLS setup (Bambu uses self-signed certs)
-        self.client.tls_set(cert_reqs=ssl.CERT_NONE)
+        # TLS setup - Bambu uses TLS 1.2 with self-signed certs
+        import ssl
+        self.client.tls_set(
+            tls_version=ssl.PROTOCOL_TLSv1_2,
+            cert_reqs=ssl.CERT_NONE
+        )
         self.client.tls_insecure_set(True)
         
         # Auth (bblp as username, access code as password for local LAN mode)
