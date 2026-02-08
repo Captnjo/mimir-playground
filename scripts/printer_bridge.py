@@ -16,6 +16,7 @@ import paho.mqtt.client as mqtt
 # Configuration
 PRINTER_IP = "192.168.1.140"
 PRINTER_SERIAL = "03919c460100975"
+PRINTER_ACCESS_CODE = "33125022"  # From LAN Only Mode
 PRINTER_PORT = 8883
 
 # Topics
@@ -66,8 +67,8 @@ class PrinterBridge:
         self.client.tls_set(cert_reqs=ssl.CERT_NONE)
         self.client.tls_insecure_set(True)
         
-        # Auth (serial as both username and password)
-        self.client.username_pw_set(PRINTER_SERIAL, PRINTER_SERIAL)
+        # Auth (serial as username, access code as password)
+        self.client.username_pw_set(PRINTER_SERIAL, PRINTER_ACCESS_CODE)
         
         try:
             self.client.connect(PRINTER_IP, PRINTER_PORT, 60)
